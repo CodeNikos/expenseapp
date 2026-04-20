@@ -1,0 +1,13 @@
+aiosmtplib>=3.0.0
+asyncpg
+bcrypt>=4.0.1,<5
+cryptography>=42.0.0
+email-validator
+fastapi
+httpx
+passlib[bcrypt]
+pydantic-settings
+python-jose[cryptography]
+python-multipart
+sqlalchemy[asyncio]
+uvicorn[standard]
