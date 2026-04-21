@@ -305,10 +305,18 @@ async def admin_list_users(
     _: User = Depends(get_current_admin),
     session: AsyncSession = Depends(get_db),
 ):
-    result = await session.execute(
-        select(User).options(selectinload(User.integration_settings)).order_by(User.email),
-    )
-    users = result.scalars().unique().all()
+    try:
+        result = await session.execute(
+            select(User).options(selectinload(User.integration_settings)).order_by(User.email),
+        )
+        users = result.scalars().unique().all()
+    except Exception as exc:
+        logger.exception("Error al listar usuarios: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno al obtener usuarios: {exc}",
+        ) from exc
+
     items: list[AdminUserListItem] = []
     for u in users:
         integration = u.integration_settings

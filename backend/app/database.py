@@ -22,13 +22,32 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
+    import logging
+    logger = logging.getLogger(__name__)
     settings = get_settings()
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
+
+        # --- Migraciones tabla users ---
+        await connection.execute(
+            text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true")
+        )
+        await connection.execute(
+            text("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(32) NOT NULL DEFAULT 'user'")
+        )
+        await connection.execute(
+            text("ALTER TABLE users ADD COLUMN IF NOT EXISTS language VARCHAR(8) NOT NULL DEFAULT 'es'")
+        )
         await connection.execute(
             text(
-                "ALTER TABLE users "
-                "ADD COLUMN IF NOT EXISTS role VARCHAR(32) NOT NULL DEFAULT 'user'"
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()"
+            )
+        )
+        await connection.execute(
+            text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                "updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()"
             )
         )
         for email in settings.initial_admin_emails:
@@ -36,12 +55,6 @@ async def init_db() -> None:
                 text("UPDATE users SET role = 'admin' WHERE lower(email) = lower(:email)"),
                 {"email": email},
             )
-        await connection.execute(
-            text(
-                "ALTER TABLE users "
-                "ADD COLUMN IF NOT EXISTS language VARCHAR(8) NOT NULL DEFAULT 'es'"
-            )
-        )
         # Migracion ligera sin Alembic: nueva columna para la clave de Mistral
         # y copia del valor legado cuando exista.
         await connection.execute(
