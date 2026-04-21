@@ -121,6 +121,16 @@ async def get_target_user_or_404(session: AsyncSession, user_id: int) -> User:
     return target
 
 
+@app.get("/")
+async def root():
+    """Origen del host (balanceadores y probes suelen pedir GET /)."""
+    return {
+        "service": settings.app_name,
+        "health": "/api/health",
+        "docs": "/docs",
+    }
+
+
 @app.get("/api/health")
 async def healthcheck():
     return {"status": "ok"}
