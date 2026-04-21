@@ -1,4 +1,5 @@
 import json
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -40,12 +41,21 @@ from .schemas import (
 )
 from .settings_service import ensure_odoo_ready, ensure_ocr_ready, get_or_create_settings, read_settings, upsert_settings
 
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    if STATIC_ROOT is not None:
+        logger.info("Sirviendo SPA desde %s", STATIC_ROOT)
+    else:
+        logger.warning(
+            "No hay build del frontend (falta static/index.html). "
+            "Copia el contenido de frontend/dist a backend/static o define STATIC_FILES_DIR. "
+            "GET / seguira respondiendo JSON hasta entonces."
+        )
     await init_db()
     warm_encryption_config()
     yield
@@ -143,16 +153,26 @@ async def get_target_user_or_404(session: AsyncSession, user_id: int) -> User:
     return target
 
 
-if STATIC_ROOT is None:
-
-    @app.get("/")
-    async def root():
-        """Sin build del frontend: respuesta JSON en la raiz (probes, etc.)."""
+@app.get("/")
+async def root():
+    """Ruta raiz: API info o mensaje si hay frontend estatico (el SPA sigue en /login, etc.)."""
+    if STATIC_ROOT is None:
         return {
             "service": settings.app_name,
             "health": "/api/health",
             "docs": "/docs",
         }
+    return {
+        "service": settings.app_name,
+        "message": "Frontend disponible. Visita /api/health para health check",
+        "api_endpoints": {
+            "health": "/api/health",
+            "docs": "/docs",
+            "auth": "/api/auth",
+            "expenses": "/api/expenses",
+            "settings": "/api/settings",
+        },
+    }
 
 
 @app.get("/api/health")
