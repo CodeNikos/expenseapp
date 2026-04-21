@@ -1,8 +1,10 @@
 import json
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -60,6 +62,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _resolve_static_root() -> Path | None:
+    """Directorio con index.html del frontend (build Vite). None = solo API."""
+    raw = (settings.static_files_dir or "").strip()
+    candidates: list[Path] = []
+    if raw:
+        candidates.append(Path(raw))
+    candidates.append(Path(__file__).resolve().parent.parent / "static")
+    for p in candidates:
+        try:
+            resolved = p.resolve()
+            if resolved.is_dir() and (resolved / "index.html").is_file():
+                return resolved
+        except OSError:
+            continue
+    return None
+
+
+STATIC_ROOT = _resolve_static_root()
 
 
 def merge_expense_payload(extracted, overrides):
@@ -121,14 +143,16 @@ async def get_target_user_or_404(session: AsyncSession, user_id: int) -> User:
     return target
 
 
-@app.get("/")
-async def root():
-    """Origen del host (balanceadores y probes suelen pedir GET /)."""
-    return {
-        "service": settings.app_name,
-        "health": "/api/health",
-        "docs": "/docs",
-    }
+if STATIC_ROOT is None:
+
+    @app.get("/")
+    async def root():
+        """Sin build del frontend: respuesta JSON en la raiz (probes, etc.)."""
+        return {
+            "service": settings.app_name,
+            "health": "/api/health",
+            "docs": "/docs",
+        }
 
 
 @app.get("/api/health")
@@ -512,4 +536,13 @@ async def process_expense(
         extracted_expense=merged_expense,
         expense=expense,
         raw_text=raw_text,
+    )
+
+
+if STATIC_ROOT is not None:
+    # Debe ir al final: las rutas /api y /docs tienen prioridad sobre el SPA.
+    app.mount(
+        "/",
+        StaticFiles(directory=str(STATIC_ROOT), html=True),
+        name="spa",
     )

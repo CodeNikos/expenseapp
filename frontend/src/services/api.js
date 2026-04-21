@@ -1,4 +1,11 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+/** Base del API. En prod, vacio = mismo origen (API sirve el build y /api/...). */
+const API_URL = (() => {
+  const raw = import.meta.env.VITE_API_URL;
+  if (raw != null && String(raw).trim() !== '') {
+    return String(raw).replace(/\/$/, '');
+  }
+  return import.meta.env.DEV ? 'http://localhost:8000' : '';
+})();
 
 /** Convierte detail de FastAPI/Pydantic (string, objeto o lista) en texto legible. */
 function formatApiDetail(detail) {

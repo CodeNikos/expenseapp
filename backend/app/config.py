@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     smtp_password: str = Field("", alias="SMTP_PASSWORD")
     smtp_from: str = Field("", alias="SMTP_FROM")
     smtp_use_tls: bool = Field(True, alias="SMTP_USE_TLS")
+    # Carpeta con el build de Vite (index.html, assets/). Vacio = no servir SPA desde la API.
+    static_files_dir: str = Field("", alias="STATIC_FILES_DIR")
 
     model_config = SettingsConfigDict(
         env_file=".env",
