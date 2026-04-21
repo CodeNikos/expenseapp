@@ -14,6 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from . import models  # noqa: F401
 from .auth import authenticate_user, create_access_token, get_current_admin, get_current_user, get_password_hash
+from .bootstrap_admin import ensure_bootstrap_admin
 from .config import get_settings
 from .database import get_db, init_db
 from .secrets_crypto import decrypt_secret, secret_is_set, warm_encryption_config
@@ -22,6 +23,7 @@ from .ocr import extract_text_from_image, parse_receipt_text
 from .odoo_client import authenticate_odoo, create_odoo_expense
 from .password_reset_service import request_password_reset, reset_password_with_token
 from .schemas import (
+    AdminUserCreate,
     AdminUserListItem,
     ExpenseActionResponse,
     ExpenseProcessPayload,
@@ -90,6 +92,7 @@ async def lifespan(_: FastAPI):
             "GET / seguira respondiendo JSON hasta entonces."
         )
     await init_db()
+    await ensure_bootstrap_admin()
     warm_encryption_config()
     yield
 
@@ -324,17 +327,17 @@ async def admin_list_users(
 
 @app.post("/api/admin/users", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 async def admin_create_user(
-    payload: UserCreate,
+    payload: AdminUserCreate,
     _: User = Depends(get_current_admin),
     session: AsyncSession = Depends(get_db),
 ):
-    """Crea un usuario con rol user (ignora ALLOW_OPEN_REGISTRATION)."""
+    """Crea un usuario con rol user o admin (ignora ALLOW_OPEN_REGISTRATION)."""
     user = User(
         email=payload.email.lower(),
         full_name=payload.full_name.strip(),
         hashed_password=get_password_hash(payload.password),
         is_active=True,
-        role="user",
+        role=payload.role,
         language="es",
     )
     session.add(user)

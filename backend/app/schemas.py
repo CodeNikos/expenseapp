@@ -11,9 +11,18 @@ class UserCreate(BaseModel):
     password: str = Field(min_length=8, max_length=128)
 
 
+class AdminUserCreate(BaseModel):
+    """Alta de usuario desde panel admin (permite rol)."""
+
+    email: EmailStr
+    full_name: str = Field(min_length=2, max_length=255)
+    password: str = Field(min_length=8, max_length=128)
+    role: Literal["user", "admin"] = "user"
+
+
 class UserLogin(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
+    password: str = Field(min_length=1, max_length=128)
 
 
 class PasswordResetRequest(BaseModel):

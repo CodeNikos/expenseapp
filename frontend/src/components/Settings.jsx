@@ -28,6 +28,7 @@ const initialCreateUser = {
   full_name: '',
   password: '',
   confirmPassword: '',
+  role: 'user',
 };
 
 /** [fieldName, translation key under settings.*, input kind] */
@@ -236,6 +237,7 @@ export default function Settings({ onSaved }) {
         email: createFields.email.trim(),
         full_name: createFields.full_name.trim(),
         password: createFields.password,
+        role: createFields.role,
       });
       setCreateSuccess(t('settings.userCreated', { email: created.email }));
       setCreateFields(initialCreateUser);
@@ -331,6 +333,17 @@ export default function Settings({ onSaved }) {
                 onChange={(e) => setCreateFields((p) => ({ ...p, full_name: e.target.value }))}
                 required
               />
+            </label>
+            <label className="block space-y-2 sm:col-span-2">
+              <span className="text-sm font-medium text-slate-600">{t('settings.createRole')}</span>
+              <select
+                className={inputClass}
+                value={createFields.role}
+                onChange={(e) => setCreateFields((p) => ({ ...p, role: e.target.value }))}
+              >
+                <option value="user">{t('settings.roleUser')}</option>
+                <option value="admin">{t('settings.roleAdmin')}</option>
+              </select>
             </label>
             <label className="block space-y-2">
               <span className="text-sm font-medium text-slate-600">{t('settings.password')}</span>

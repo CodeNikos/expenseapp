@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = Field(True, alias="SMTP_USE_TLS")
     # Carpeta con el build de Vite (index.html, assets/). Vacio = no servir SPA desde la API.
     static_files_dir: str = Field("", alias="STATIC_FILES_DIR")
+    # Usuario admin creado al arrancar si no existe (primer deploy). Desactivar en prod tras configurar.
+    bootstrap_admin_enabled: bool = Field(True, alias="BOOTSTRAP_ADMIN_ENABLED")
+    bootstrap_admin_email: str = Field("admin@expenseapp.local", alias="BOOTSTRAP_ADMIN_EMAIL")
+    bootstrap_admin_password: str = Field("admin01", alias="BOOTSTRAP_ADMIN_PASSWORD")
+    bootstrap_admin_full_name: str = Field("Administrador", alias="BOOTSTRAP_ADMIN_FULL_NAME")
 
     model_config = SettingsConfigDict(
         env_file=".env",
