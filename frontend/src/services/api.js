@@ -1,8 +1,15 @@
-/** Base del API. En prod, vacio = mismo origen (API sirve el build y /api/...). */
+/**
+ * Base del API (sin /api). En prod con mismo host: deja VITE_API_URL vacia → rutas relativas /api/...
+ * Si en prod el build incluye localhost por error, se ignora y se usa mismo origen.
+ */
 const API_URL = (() => {
   const raw = import.meta.env.VITE_API_URL;
   if (raw != null && String(raw).trim() !== '') {
-    return String(raw).replace(/\/$/, '');
+    let base = String(raw).replace(/\/$/, '');
+    if (import.meta.env.PROD && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(base)) {
+      base = '';
+    }
+    return base;
   }
   return import.meta.env.DEV ? 'http://localhost:8000' : '';
 })();
