@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     static_files_dir: str = Field("", alias="STATIC_FILES_DIR")
     # Usuario admin creado al arrancar si no existe (primer deploy). Desactivar en prod tras configurar.
     bootstrap_admin_enabled: bool = Field(True, alias="BOOTSTRAP_ADMIN_ENABLED")
-    bootstrap_admin_email: str = Field("admin@expenseapp.local", alias="BOOTSTRAP_ADMIN_EMAIL")
+    bootstrap_admin_email: str = Field("admin@expenseapp.com", alias="BOOTSTRAP_ADMIN_EMAIL")
     bootstrap_admin_password: str = Field("admin01pa", alias="BOOTSTRAP_ADMIN_PASSWORD")
     bootstrap_admin_full_name: str = Field("Administrador", alias="BOOTSTRAP_ADMIN_FULL_NAME")
 
