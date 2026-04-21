@@ -153,26 +153,16 @@ async def get_target_user_or_404(session: AsyncSession, user_id: int) -> User:
     return target
 
 
-@app.get("/")
-async def root():
-    """Ruta raiz: API info o mensaje si hay frontend estatico (el SPA sigue en /login, etc.)."""
-    if STATIC_ROOT is None:
+if STATIC_ROOT is None:
+
+    @app.get("/")
+    async def root():
+        """Sin build del frontend: respuesta JSON en la raiz (probes, etc.)."""
         return {
             "service": settings.app_name,
             "health": "/api/health",
             "docs": "/docs",
         }
-    return {
-        "service": settings.app_name,
-        "message": "Frontend disponible. Visita /api/health para health check",
-        "api_endpoints": {
-            "health": "/api/health",
-            "docs": "/docs",
-            "auth": "/api/auth",
-            "expenses": "/api/expenses",
-            "settings": "/api/settings",
-        },
-    }
 
 
 @app.get("/api/health")
