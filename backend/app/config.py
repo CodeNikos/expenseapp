@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field("HS256", alias="JWT_ALGORITHM")
     access_token_expire_minutes: int = Field(60 * 12, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     cors_origins_raw: str = Field(
-        "http://localhost:5173,http://127.0.0.1:5173",
+        "http://web-1drint8y5f1s-service",
         alias="CORS_ORIGINS",
     )
     allow_open_registration: bool = Field(True, alias="ALLOW_OPEN_REGISTRATION")
@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     mistral_ocr_model: str = Field("mistral-ocr-latest", alias="MISTRAL_OCR_MODEL")
     initial_admin_emails_raw: str = Field("", alias="INITIAL_ADMIN_EMAILS")
     secrets_encryption_keys_raw: str = Field("", alias="SECRETS_ENCRYPTION_KEYS")
-    public_frontend_url: str = Field("http://localhost:5173", alias="PUBLIC_FRONTEND_URL")
+    public_frontend_url: str = Field("https://web-1drint8y5f1s.up-de-fra1-k8s-1.apps.run-on-seenode.com/", alias="PUBLIC_FRONTEND_URL")
     password_reset_ttl_minutes: int = Field(60, alias="PASSWORD_RESET_TTL_MINUTES", ge=5, le=10080)
     smtp_host: str = Field("", alias="SMTP_HOST")
     smtp_port: int = Field(587, alias="SMTP_PORT", ge=1, le=65535)
