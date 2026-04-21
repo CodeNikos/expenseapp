@@ -2,6 +2,4 @@
 __pycache__/
 *.pyc
 .env.local
-# Build del frontend para servir desde FastAPI (mantener solo .gitkeep en repo)
-static/*
-!static/.gitkeep
+

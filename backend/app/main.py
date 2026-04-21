@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError
@@ -46,34 +47,6 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-@asynccontextmanager
-async def lifespan(_: FastAPI):
-    if STATIC_ROOT is not None:
-        logger.info("Sirviendo SPA desde %s", STATIC_ROOT)
-    else:
-        logger.warning(
-            "No hay build del frontend (falta static/index.html). "
-            "Copia el contenido de frontend/dist a backend/static o define STATIC_FILES_DIR. "
-            "GET / seguira respondiendo JSON hasta entonces."
-        )
-    await init_db()
-    warm_encryption_config()
-    yield
-
-
-app = FastAPI(title=settings.app_name, lifespan=lifespan)
-# CORS: lista desde .env + regex para dev (Vite en cualquier puerto, localhost vs 127.0.0.1).
-# Sin esto el navegador puede mostrar error CORS aunque el backend responda (sobre todo si el Origin no coincide al 100%).
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
 def _resolve_static_root() -> Path | None:
     """Directorio con index.html del frontend (build Vite). None = solo API."""
     raw = (settings.static_files_dir or "").strip()
@@ -92,6 +65,47 @@ def _resolve_static_root() -> Path | None:
 
 
 STATIC_ROOT = _resolve_static_root()
+
+
+def _safe_file_under_dir(base: Path, relative: str) -> Path | None:
+    """Devuelve ruta a archivo bajo base si existe y no hay path traversal."""
+    if not relative or ".." in Path(relative).parts:
+        return None
+    candidate = (base / relative).resolve()
+    try:
+        candidate.relative_to(base.resolve())
+    except ValueError:
+        return None
+    return candidate if candidate.is_file() else None
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    if STATIC_ROOT is not None:
+        logger.info("Sirviendo SPA desde %s", STATIC_ROOT)
+    else:
+        logger.warning(
+            "No hay build del frontend (falta static/index.html). "
+            "Copia el contenido de frontend/dist a backend/static o define STATIC_FILES_DIR. "
+            "GET / seguira respondiendo JSON hasta entonces."
+        )
+    await init_db()
+    warm_encryption_config()
+    yield
+
+
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
+# CORS: lista desde .env + regex para dev (Vite en cualquier puerto, localhost vs 127.0.0.1).
+# En produccion incluye el origen publico del frontend en CORS_ORIGINS (https://..., sin barra final).
+# Sin esto el navegador puede mostrar error CORS aunque el backend responda.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def merge_expense_payload(extracted, overrides):
@@ -550,9 +564,21 @@ async def process_expense(
 
 
 if STATIC_ROOT is not None:
-    # Debe ir al final: las rutas /api y /docs tienen prioridad sobre el SPA.
-    app.mount(
-        "/",
-        StaticFiles(directory=str(STATIC_ROOT), html=True),
-        name="spa",
-    )
+    # /assets lo sirve Vite; el fallback SPA evita 404 en /login, /history, etc. (produccion).
+    # Un solo StaticFiles(html=True) en "/" falla a menudo tras proxies o con el orden de rutas.
+    _assets = STATIC_ROOT / "assets"
+    if _assets.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(_assets)), name="vite_assets")
+
+    @app.get("/")
+    async def spa_index():
+        return FileResponse(STATIC_ROOT / "index.html")
+
+    @app.get("/{full_path:path}")
+    async def spa_serve(full_path: str):
+        if full_path.startswith("api/") or full_path == "api":
+            raise HTTPException(status_code=404, detail="Not Found")
+        existing = _safe_file_under_dir(STATIC_ROOT, full_path)
+        if existing is not None:
+            return FileResponse(existing)
+        return FileResponse(STATIC_ROOT / "index.html")
