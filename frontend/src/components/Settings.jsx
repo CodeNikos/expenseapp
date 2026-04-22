@@ -447,45 +447,49 @@ export default function Settings({ onSaved }) {
                 <th className="px-4 py-3">{t('settings.colRole')}</th>
                 <th className="hidden px-4 py-3 sm:table-cell">{t('settings.colMistral')}</th>
                 <th className="hidden px-4 py-3 sm:table-cell">{t('settings.colOdoo')}</th>
-                <th className="px-4 py-3">{t('settings.colActions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-800">
               {usersLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
                     {t('settings.loadingUsers')}
                   </td>
                 </tr>
               ) : !users.length ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
                     {t('settings.noUsers')}
                   </td>
                 </tr>
               ) : (
                 users.map((row) => {
                   const selected = row.id === selectedUserId;
-                  const isSelf = row.id === user?.id;
-                  const busyRole = actionBusy === `role-${row.id}`;
-                  const busyDel = actionBusy === `delete-${row.id}`;
                   return (
                     <tr
                       key={row.id}
-                      className={`transition ${selected ? 'bg-sky-50/90 ring-1 ring-inset ring-sky-200' : 'hover:bg-slate-50/90'}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => { setSelectedUserId(row.id); setActionMessage(''); setActionError(''); }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setSelectedUserId(row.id);
+                          setActionMessage('');
+                          setActionError('');
+                        }
+                      }}
+                      className={`cursor-pointer transition ${
+                        selected ? 'bg-sky-50/90 ring-1 ring-inset ring-sky-200' : 'hover:bg-slate-50/90'
+                      }`}
                     >
-                      <td
-                        className="cursor-pointer px-4 py-3"
-                        onClick={() => setSelectedUserId(row.id)}
-                      >
+                      <td className="px-4 py-3">
                         <span className="font-medium text-slate-900">{row.full_name}</span>
                         {selected ? (
-                          <span className="ml-2 text-xs font-medium text-sky-700">{t('settings.editingIntegration')}</span>
+                          <span className="ml-2 text-xs font-medium text-sky-700">{t('settings.selected')}</span>
                         ) : null}
                       </td>
-                      <td className="hidden cursor-pointer px-4 py-3 text-slate-600 md:table-cell" onClick={() => setSelectedUserId(row.id)}>
-                        {row.email}
-                      </td>
+                      <td className="hidden px-4 py-3 text-slate-600 md:table-cell">{row.email}</td>
                       <td className="px-4 py-3">
                         <span
                           className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -513,32 +517,6 @@ export default function Settings({ onSaved }) {
                           pendingLabel={t('settings.badgePending')}
                         />
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            disabled={isSelf || !!actionBusy}
-                            onClick={() => handleChangeRole(row)}
-                            className="rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-800 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-40"
-                            title={isSelf ? t('settings.errOwnRole') : ''}
-                          >
-                            {busyRole
-                              ? '...'
-                              : row.role === 'admin'
-                                ? t('settings.makeUser')
-                                : t('settings.makeAdmin')}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={isSelf || !!actionBusy}
-                            onClick={() => handleDeleteUser(row)}
-                            className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
-                            title={isSelf ? t('settings.errOwnDelete') : ''}
-                          >
-                            {busyDel ? t('settings.deletingUser') : t('settings.deleteUser')}
-                          </button>
-                        </div>
-                      </td>
                     </tr>
                   );
                 })
@@ -546,7 +524,73 @@ export default function Settings({ onSaved }) {
             </tbody>
           </table>
         </div>
-        <p className="mt-3 text-xs text-slate-500">{t('settings.tableHint')}</p>
+        <p className="mt-3 text-xs text-slate-400">{t('settings.tableHint')}</p>
+
+        {/* Panel de acciones para el usuario seleccionado */}
+        {(() => {
+          const selectedUser = users.find((u) => u.id === selectedUserId);
+          if (!selectedUser) return null;
+          const isSelf = selectedUser.id === user?.id;
+          const busyRole = actionBusy === `role-${selectedUser.id}`;
+          const busyDel = actionBusy === `delete-${selectedUser.id}`;
+          return (
+            <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50/60 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-slate-900">{selectedUser.full_name}</p>
+                  <p className="truncate text-xs text-slate-500">{selectedUser.email}</p>
+                </div>
+                <span
+                  className={`shrink-0 inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                    selectedUser.role === 'admin'
+                      ? 'border border-violet-200 bg-violet-50 text-violet-800'
+                      : 'border border-slate-200 bg-white text-slate-700'
+                  }`}
+                >
+                  {selectedUser.role === 'admin' ? t('settings.roleAdmin') : t('settings.roleUser')}
+                </span>
+              </div>
+
+              {actionMessage ? (
+                <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                  {actionMessage}
+                </p>
+              ) : null}
+              {actionError ? (
+                <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
+                  {actionError}
+                </p>
+              ) : null}
+
+              {isSelf ? (
+                <p className="mt-3 text-xs text-slate-500">{t('settings.selfActionsDisabled')}</p>
+              ) : (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={!!actionBusy}
+                    onClick={() => handleChangeRole(selectedUser)}
+                    className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-800 shadow-sm transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {busyRole
+                      ? '...'
+                      : selectedUser.role === 'admin'
+                        ? t('settings.makeUser')
+                        : t('settings.makeAdmin')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!!actionBusy}
+                    onClick={() => handleDeleteUser(selectedUser)}
+                    className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 shadow-sm transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {busyDel ? t('settings.deletingUser') : t('settings.deleteUser')}
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       <div>
