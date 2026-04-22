@@ -25,6 +25,7 @@ from .password_reset_service import request_password_reset, reset_password_with_
 from .schemas import (
     AdminUserCreate,
     AdminUserListItem,
+    AdminUserRoleUpdate,
     ExpenseActionResponse,
     ExpenseProcessPayload,
     ExpenseProcessResponse,
@@ -359,6 +360,56 @@ async def admin_create_user(
         ) from exc
     await session.refresh(user)
     return user
+
+
+@app.patch("/api/admin/users/{user_id}/role", response_model=AdminUserListItem)
+async def admin_update_user_role(
+    user_id: int,
+    payload: AdminUserRoleUpdate,
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_db),
+):
+    """Cambia el rol de un usuario (user ↔ admin). Un admin no puede modificar su propio rol."""
+    if user_id == admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No puedes cambiar tu propio rol.",
+        )
+    result = await session.execute(
+        select(User).options(selectinload(User.integration_settings)).where(User.id == user_id)
+    )
+    target = result.scalar_one_or_none()
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No se encontro el usuario solicitado.")
+    target.role = payload.role
+    await session.commit()
+    await session.refresh(target)
+    integration = target.integration_settings
+    return AdminUserListItem(
+        id=target.id,
+        email=target.email,
+        full_name=target.full_name,
+        role=target.role,
+        has_mistral_api_key=secret_is_set(integration.mistral_api_key) if integration else False,
+        has_odoo_api_key=secret_is_set(integration.odoo_api_key) if integration else False,
+    )
+
+
+@app.delete("/api/admin/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_delete_user(
+    user_id: int,
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_db),
+):
+    """Elimina un usuario y todos sus datos (gastos, integraciones, tokens). No aplica a la cuenta propia."""
+    if user_id == admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No puedes eliminar tu propia cuenta.",
+        )
+    target = await get_target_user_or_404(session, user_id)
+    await session.delete(target)
+    await session.commit()
 
 
 @app.get("/api/admin/users/{user_id}/integrations", response_model=IntegrationSettingsRead)

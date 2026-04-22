@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   createAdminUser,
+  deleteAdminUser,
   getAdminUserIntegrations,
   listAdminUsers,
   testAdminUserOdoo,
   updateAdminUserIntegrations,
+  updateAdminUserRole,
 } from '../services/api';
 import LanguageSwitcher from './LanguageSwitcher';
 import { useAuth } from '../hooks/useAuth';
@@ -80,6 +82,10 @@ export default function Settings({ onSaved }) {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
   const [createSuccess, setCreateSuccess] = useState('');
+
+  const [actionBusy, setActionBusy] = useState(null);
+  const [actionMessage, setActionMessage] = useState('');
+  const [actionError, setActionError] = useState('');
 
   const fetchUsers = useCallback(async () => {
     setUsersLoading(true);
@@ -251,6 +257,41 @@ export default function Settings({ onSaved }) {
     }
   }
 
+  async function handleChangeRole(targetUser) {
+    const newRole = targetUser.role === 'admin' ? 'user' : 'admin';
+    const roleName = newRole === 'admin' ? t('settings.roleAdmin') : t('settings.roleUser');
+    if (!window.confirm(t('settings.confirmChangeRole', { name: targetUser.full_name, role: roleName }))) return;
+    setActionBusy(`role-${targetUser.id}`);
+    setActionError('');
+    setActionMessage('');
+    try {
+      const updated = await updateAdminUserRole(token, targetUser.id, newRole);
+      setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+      setActionMessage(t('settings.roleChanged', { name: updated.full_name, role: roleName }));
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleDeleteUser(targetUser) {
+    if (!window.confirm(t('settings.confirmDeleteUser', { name: targetUser.full_name }))) return;
+    setActionBusy(`delete-${targetUser.id}`);
+    setActionError('');
+    setActionMessage('');
+    try {
+      await deleteAdminUser(token, targetUser.id);
+      setUsers((prev) => prev.filter((u) => u.id !== targetUser.id));
+      if (selectedUserId === targetUser.id) setSelectedUserId(null);
+      setActionMessage(t('settings.userDeleted', { name: targetUser.full_name }));
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
   return (
     <section className="space-y-8">
       <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)] sm:p-6">
@@ -386,57 +427,66 @@ export default function Settings({ onSaved }) {
           </form>
         ) : null}
 
+        {actionMessage ? (
+          <p className="mb-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            {actionMessage}
+          </p>
+        ) : null}
+        {actionError ? (
+          <p className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+            {actionError}
+          </p>
+        ) : null}
+
         <div className="overflow-x-auto rounded-2xl border border-slate-100">
           <table className="min-w-full text-left text-sm">
             <thead className="border-b border-slate-100 bg-slate-50/90 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-4 py-3">{t('settings.colUser')}</th>
-                <th className="px-4 py-3">{t('settings.colEmail')}</th>
-                <th className="hidden px-4 py-3 sm:table-cell">{t('settings.colRole')}</th>
-                <th className="px-4 py-3">{t('settings.colMistral')}</th>
-                <th className="px-4 py-3">{t('settings.colOdoo')}</th>
+                <th className="hidden px-4 py-3 md:table-cell">{t('settings.colEmail')}</th>
+                <th className="px-4 py-3">{t('settings.colRole')}</th>
+                <th className="hidden px-4 py-3 sm:table-cell">{t('settings.colMistral')}</th>
+                <th className="hidden px-4 py-3 sm:table-cell">{t('settings.colOdoo')}</th>
+                <th className="px-4 py-3">{t('settings.colActions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-800">
               {usersLoading ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
                     {t('settings.loadingUsers')}
                   </td>
                 </tr>
               ) : !users.length ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
                     {t('settings.noUsers')}
                   </td>
                 </tr>
               ) : (
                 users.map((row) => {
                   const selected = row.id === selectedUserId;
+                  const isSelf = row.id === user?.id;
+                  const busyRole = actionBusy === `role-${row.id}`;
+                  const busyDel = actionBusy === `delete-${row.id}`;
                   return (
                     <tr
                       key={row.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setSelectedUserId(row.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          setSelectedUserId(row.id);
-                        }
-                      }}
-                      className={`cursor-pointer transition hover:bg-slate-50/90 ${
-                        selected ? 'bg-sky-50/90 ring-1 ring-inset ring-sky-200' : ''
-                      }`}
+                      className={`transition ${selected ? 'bg-sky-50/90 ring-1 ring-inset ring-sky-200' : 'hover:bg-slate-50/90'}`}
                     >
-                      <td className="px-4 py-3">
+                      <td
+                        className="cursor-pointer px-4 py-3"
+                        onClick={() => setSelectedUserId(row.id)}
+                      >
                         <span className="font-medium text-slate-900">{row.full_name}</span>
                         {selected ? (
                           <span className="ml-2 text-xs font-medium text-sky-700">{t('settings.editingIntegration')}</span>
                         ) : null}
                       </td>
-                      <td className="px-4 py-3 text-slate-600">{row.email}</td>
-                      <td className="hidden px-4 py-3 sm:table-cell">
+                      <td className="hidden cursor-pointer px-4 py-3 text-slate-600 md:table-cell" onClick={() => setSelectedUserId(row.id)}>
+                        {row.email}
+                      </td>
+                      <td className="px-4 py-3">
                         <span
                           className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
                             row.role === 'admin'
@@ -444,10 +494,10 @@ export default function Settings({ onSaved }) {
                               : 'border border-slate-200 bg-white text-slate-700'
                           }`}
                         >
-                          {row.role}
+                          {row.role === 'admin' ? t('settings.roleAdmin') : t('settings.roleUser')}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="hidden px-4 py-3 sm:table-cell">
                         <KeyBadge
                           ok={row.has_mistral_api_key}
                           label={t('settings.badgeMistral')}
@@ -455,13 +505,39 @@ export default function Settings({ onSaved }) {
                           pendingLabel={t('settings.badgePending')}
                         />
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="hidden px-4 py-3 sm:table-cell">
                         <KeyBadge
                           ok={row.has_odoo_api_key}
                           label={t('settings.badgeOdoo')}
                           readyLabel={t('settings.badgeReady')}
                           pendingLabel={t('settings.badgePending')}
                         />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            disabled={isSelf || !!actionBusy}
+                            onClick={() => handleChangeRole(row)}
+                            className="rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-800 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-40"
+                            title={isSelf ? t('settings.errOwnRole') : ''}
+                          >
+                            {busyRole
+                              ? '...'
+                              : row.role === 'admin'
+                                ? t('settings.makeUser')
+                                : t('settings.makeAdmin')}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isSelf || !!actionBusy}
+                            onClick={() => handleDeleteUser(row)}
+                            className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                            title={isSelf ? t('settings.errOwnDelete') : ''}
+                          >
+                            {busyDel ? t('settings.deletingUser') : t('settings.deleteUser')}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

@@ -178,6 +178,21 @@ export function testAdminUserOdoo(token, userId, payload) {
   });
 }
 
+export function updateAdminUserRole(token, userId, role) {
+  return request(`/api/admin/users/${userId}/role`, {
+    method: 'PATCH',
+    token,
+    body: { role },
+  });
+}
+
+export function deleteAdminUser(token, userId) {
+  return request(`/api/admin/users/${userId}`, {
+    method: 'DELETE',
+    token,
+  });
+}
+
 export function processExpense(token, file, payload) {
   const formData = new FormData();
   formData.append('file', file);
