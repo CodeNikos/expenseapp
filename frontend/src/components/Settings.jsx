@@ -10,6 +10,7 @@ import {
 } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { useI18n } from '../hooks/useI18n';
+import { useToast } from '../hooks/useToast';
 
 const defaultState = {
   mistral_api_key: '',
@@ -65,39 +66,32 @@ function KeyBadge({ ok, label, readyLabel, pendingLabel }) {
 export default function Settings({ onSaved }) {
   const { token, user } = useAuth();
   const { t } = useI18n();
+  const toast = useToast();
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(true);
-  const [usersError, setUsersError] = useState('');
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [form, setForm] = useState(defaultState);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
 
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [createFields, setCreateFields] = useState(initialCreateUser);
   const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState('');
-  const [createSuccess, setCreateSuccess] = useState('');
 
   const [actionBusy, setActionBusy] = useState(null);
-  const [actionMessage, setActionMessage] = useState('');
-  const [actionError, setActionError] = useState('');
 
   const fetchUsers = useCallback(async () => {
     setUsersLoading(true);
-    setUsersError('');
     try {
       const list = await listAdminUsers(token);
       setUsers(list);
     } catch (loadErr) {
-      setUsersError(loadErr.message);
+      toast.error(loadErr.message);
     } finally {
       setUsersLoading(false);
     }
-  }, [token]);
+  }, [token, toast]);
 
   useEffect(() => {
     fetchUsers();
@@ -128,8 +122,6 @@ export default function Settings({ onSaved }) {
 
     async function loadSettings() {
       setLoading(true);
-      setError('');
-      setMessage('');
       try {
         const payload = await getAdminUserIntegrations(token, selectedUserId);
         if (!ignore) {
@@ -137,7 +129,7 @@ export default function Settings({ onSaved }) {
         }
       } catch (loadError) {
         if (!ignore) {
-          setError(loadError.message);
+          toast.error(loadError.message);
         }
       } finally {
         if (!ignore) {
@@ -151,7 +143,7 @@ export default function Settings({ onSaved }) {
     return () => {
       ignore = true;
     };
-  }, [token, selectedUserId]);
+  }, [token, selectedUserId, toast]);
 
   const isConfigured = useMemo(
     () =>
@@ -183,8 +175,6 @@ export default function Settings({ onSaved }) {
     if (selectedUserId == null) {
       return;
     }
-    setError('');
-    setMessage('');
     setSaving(true);
 
     try {
@@ -193,10 +183,10 @@ export default function Settings({ onSaved }) {
       if (user?.id === selectedUserId) {
         onSaved?.(payload);
       }
-      setMessage(t('settings.saveOk'));
+      toast.success(t('settings.saveOk'));
       await fetchUsers();
     } catch (saveError) {
-      setError(saveError.message);
+      toast.error(saveError.message);
     } finally {
       setSaving(false);
     }
@@ -206,15 +196,13 @@ export default function Settings({ onSaved }) {
     if (selectedUserId == null) {
       return;
     }
-    setError('');
-    setMessage('');
     setTesting(true);
 
     try {
       const payload = await testAdminUserOdoo(token, selectedUserId, form);
-      setMessage(payload.detail || t('settings.odooOk'));
+      toast.success(payload.detail || t('settings.odooOk'));
     } catch (testError) {
-      setError(testError.message);
+      toast.error(testError.message);
     } finally {
       setTesting(false);
     }
@@ -222,18 +210,16 @@ export default function Settings({ onSaved }) {
 
   async function handleCreateUser(event) {
     event.preventDefault();
-    setCreateError('');
-    setCreateSuccess('');
     if (createFields.password !== createFields.confirmPassword) {
-      setCreateError(t('settings.errPasswordMismatch'));
+      toast.error(t('settings.errPasswordMismatch'));
       return;
     }
     if (createFields.full_name.trim().length < 2) {
-      setCreateError(t('settings.errNameLength'));
+      toast.error(t('settings.errNameLength'));
       return;
     }
     if (createFields.password.length < 8) {
-      setCreateError(t('settings.errPasswordLength'));
+      toast.error(t('settings.errPasswordLength'));
       return;
     }
     setCreating(true);
@@ -244,13 +230,13 @@ export default function Settings({ onSaved }) {
         password: createFields.password,
         role: createFields.role,
       });
-      setCreateSuccess(t('settings.userCreated', { email: created.email }));
+      toast.success(t('settings.userCreated', { email: created.email }));
       setCreateFields(initialCreateUser);
       setShowCreateUser(false);
       await fetchUsers();
       setSelectedUserId(created.id);
     } catch (err) {
-      setCreateError(err.message);
+      toast.error(err.message);
     } finally {
       setCreating(false);
     }
@@ -261,14 +247,12 @@ export default function Settings({ onSaved }) {
     const roleName = newRole === 'admin' ? t('settings.roleAdmin') : t('settings.roleUser');
     if (!window.confirm(t('settings.confirmChangeRole', { name: targetUser.full_name, role: roleName }))) return;
     setActionBusy(`role-${targetUser.id}`);
-    setActionError('');
-    setActionMessage('');
     try {
       const updated = await updateAdminUserRole(token, targetUser.id, newRole);
       setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
-      setActionMessage(t('settings.roleChanged', { name: updated.full_name, role: roleName }));
+      toast.success(t('settings.roleChanged', { name: updated.full_name, role: roleName }));
     } catch (err) {
-      setActionError(err.message);
+      toast.error(err.message);
     } finally {
       setActionBusy(null);
     }
@@ -277,15 +261,13 @@ export default function Settings({ onSaved }) {
   async function handleDeleteUser(targetUser) {
     if (!window.confirm(t('settings.confirmDeleteUser', { name: targetUser.full_name }))) return;
     setActionBusy(`delete-${targetUser.id}`);
-    setActionError('');
-    setActionMessage('');
     try {
       await deleteAdminUser(token, targetUser.id);
       setUsers((prev) => prev.filter((u) => u.id !== targetUser.id));
       if (selectedUserId === targetUser.id) setSelectedUserId(null);
-      setActionMessage(t('settings.userDeleted', { name: targetUser.full_name }));
+      toast.success(t('settings.userDeleted', { name: targetUser.full_name }));
     } catch (err) {
-      setActionError(err.message);
+      toast.error(err.message);
     } finally {
       setActionBusy(null);
     }
@@ -310,31 +292,17 @@ export default function Settings({ onSaved }) {
         </span>
       </div>
 
-      {usersError ? (
-        <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">{usersError}</p>
-      ) : null}
-
       <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)] lg:p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-lg font-semibold text-slate-900">{t('settings.usersTitle')}</h3>
           <button
             type="button"
             className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-900 shadow-sm transition hover:bg-sky-100"
-            onClick={() => {
-              setShowCreateUser((v) => !v);
-              setCreateError('');
-              setCreateSuccess('');
-            }}
+            onClick={() => setShowCreateUser((v) => !v)}
           >
             {showCreateUser ? t('settings.closeForm') : t('settings.newUser')}
           </button>
         </div>
-
-        {createSuccess ? (
-          <p className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-            {createSuccess}
-          </p>
-        ) : null}
 
         {showCreateUser ? (
           <form
@@ -399,11 +367,6 @@ export default function Settings({ onSaved }) {
                 required
               />
             </label>
-            {createError ? (
-              <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900 sm:col-span-2">
-                {createError}
-              </p>
-            ) : null}
             <div className="sm:col-span-2">
               <button
                 type="submit"
@@ -414,17 +377,6 @@ export default function Settings({ onSaved }) {
               </button>
             </div>
           </form>
-        ) : null}
-
-        {actionMessage ? (
-          <p className="mb-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-            {actionMessage}
-          </p>
-        ) : null}
-        {actionError ? (
-          <p className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
-            {actionError}
-          </p>
         ) : null}
 
         <div className="overflow-x-auto rounded-2xl border border-slate-100">
@@ -459,13 +411,11 @@ export default function Settings({ onSaved }) {
                       key={row.id}
                       role="button"
                       tabIndex={0}
-                      onClick={() => { setSelectedUserId(row.id); setActionMessage(''); setActionError(''); }}
+                      onClick={() => setSelectedUserId(row.id)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
                           setSelectedUserId(row.id);
-                          setActionMessage('');
-                          setActionError('');
                         }
                       }}
                       className={`cursor-pointer transition ${
@@ -539,17 +489,6 @@ export default function Settings({ onSaved }) {
                   {selectedUser.role === 'admin' ? t('settings.roleAdmin') : t('settings.roleUser')}
                 </span>
               </div>
-
-              {actionMessage ? (
-                <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
-                  {actionMessage}
-                </p>
-              ) : null}
-              {actionError ? (
-                <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
-                  {actionError}
-                </p>
-              ) : null}
 
               {isSelf ? (
                 <p className="mt-3 text-xs text-slate-500">{t('settings.selfActionsDisabled')}</p>
@@ -645,15 +584,6 @@ export default function Settings({ onSaved }) {
               />
             </label>
           ))}
-
-          {error ? (
-            <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 lg:col-span-2">{error}</p>
-          ) : null}
-          {message ? (
-            <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 lg:col-span-2">
-              {message}
-            </p>
-          ) : null}
 
           <div className="flex flex-wrap gap-3 lg:col-span-2">
             <button

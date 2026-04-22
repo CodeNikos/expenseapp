@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { useI18n } from './useI18n';
 
 function dataUrlToBlob(dataUrl) {
   const [header, content] = dataUrl.split(',');
@@ -14,6 +15,7 @@ function dataUrlToBlob(dataUrl) {
 }
 
 export function useCamera() {
+  const { t } = useI18n();
   const webcamRef = useRef(null);
   const [error, setError] = useState('');
 
@@ -29,7 +31,7 @@ export function useCamera() {
       const screenshot = webcamRef.current?.getScreenshot();
 
       if (!screenshot) {
-        setError('No se pudo capturar la imagen de la camara.');
+        setError(t('camera.errCapture'));
         return null;
       }
 
@@ -45,7 +47,7 @@ export function useCamera() {
         previewUrl: screenshot,
       };
     } catch (captureError) {
-      setError('No fue posible acceder a la camara.');
+      setError(t('camera.errAccess'));
       return null;
     }
   }

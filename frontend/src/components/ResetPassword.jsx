@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import LanguageSwitcher from './LanguageSwitcher';
 import { useI18n } from '../hooks/useI18n';
+import { useToast } from '../hooks/useToast';
 import { resetPassword } from '../services/api';
 
 const inputClass =
@@ -9,34 +10,31 @@ const inputClass =
 
 export default function ResetPassword() {
   const { t } = useI18n();
+  const toast = useToast();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = useMemo(() => searchParams.get('token') || '', [searchParams]);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setError('');
-    setSuccess('');
     if (password !== confirm) {
-      setError(t('reset.errMismatch'));
+      toast.error(t('reset.errMismatch'));
       return;
     }
     if (password.length < 8) {
-      setError(t('reset.errLength'));
+      toast.error(t('reset.errLength'));
       return;
     }
     setSubmitting(true);
     try {
       const res = await resetPassword({ token, password });
-      setSuccess(res.message || t('reset.passwordUpdated'));
+      toast.success(res.message || t('reset.passwordUpdated'));
       setTimeout(() => navigate('/login', { replace: true }), 1500);
     } catch (err) {
-      setError(err.message);
+      toast.error(err.message);
     } finally {
       setSubmitting(false);
     }
@@ -96,14 +94,6 @@ export default function ResetPassword() {
               required
             />
           </label>
-          {error ? (
-            <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">{error}</p>
-          ) : null}
-          {success ? (
-            <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-              {success}
-            </p>
-          ) : null}
           <button
             type="submit"
             className="w-full rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-4 py-3 font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:from-sky-600 hover:to-blue-700 disabled:cursor-not-allowed disabled:opacity-60"

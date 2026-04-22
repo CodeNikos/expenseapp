@@ -1,10 +1,21 @@
+import { useEffect, useRef } from 'react';
 import Webcam from 'react-webcam';
 import { useCamera } from '../hooks/useCamera';
 import { useI18n } from '../hooks/useI18n';
+import { useToast } from '../hooks/useToast';
 
 export default function Camera({ onCapture }) {
   const { t } = useI18n();
+  const toast = useToast();
   const { webcamRef, capture, error, videoConstraints } = useCamera();
+  const lastErrorRef = useRef('');
+
+  useEffect(() => {
+    if (error && error !== lastErrorRef.current) {
+      toast.error(error);
+    }
+    lastErrorRef.current = error;
+  }, [error, toast]);
 
   function handleCapture() {
     const result = capture();
@@ -31,8 +42,6 @@ export default function Camera({ onCapture }) {
           videoConstraints={videoConstraints}
         />
       </div>
-
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
       <button
         type="button"

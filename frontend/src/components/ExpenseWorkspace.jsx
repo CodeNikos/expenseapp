@@ -6,6 +6,7 @@ import Preview from './Preview';
 import Uploader from './Uploader';
 import { useAuth } from '../hooks/useAuth';
 import { useI18n } from '../hooks/useI18n';
+import { useToast } from '../hooks/useToast';
 import { listExpenses, processExpense } from '../services/api';
 
 const emptyExpense = {
@@ -21,12 +22,11 @@ const emptyExpense = {
 export default function ExpenseWorkspace({ integrationSettings }) {
   const { token } = useAuth();
   const { t } = useI18n();
+  const toast = useToast();
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [formValues, setFormValues] = useState(emptyExpense);
   const [expenses, setExpenses] = useState([]);
-  const [feedback, setFeedback] = useState('');
-  const [error, setError] = useState('');
   const [processing, setProcessing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -53,7 +53,7 @@ export default function ExpenseWorkspace({ integrationSettings }) {
         }
       } catch (loadError) {
         if (!ignore) {
-          setError(loadError.message);
+          toast.error(loadError.message);
         }
       }
     }
@@ -63,7 +63,7 @@ export default function ExpenseWorkspace({ integrationSettings }) {
     return () => {
       ignore = true;
     };
-  }, [token]);
+  }, [token, toast]);
 
   function resetSelection() {
     if (previewUrl.startsWith('blob:')) {
@@ -72,8 +72,6 @@ export default function ExpenseWorkspace({ integrationSettings }) {
     setSelectedFile(null);
     setPreviewUrl('');
     setFormValues(emptyExpense);
-    setFeedback('');
-    setError('');
   }
 
   function handleAssetSelection({ file, previewUrl: nextPreviewUrl }) {
@@ -82,19 +80,15 @@ export default function ExpenseWorkspace({ integrationSettings }) {
     }
     setSelectedFile(file);
     setPreviewUrl(nextPreviewUrl);
-    setFeedback('');
-    setError('');
   }
 
   async function handleProcess() {
     if (!selectedFile) {
-      setError(t('workspace.errNoFileProcess'));
+      toast.warning(t('workspace.errNoFileProcess'));
       return;
     }
 
     setProcessing(true);
-    setFeedback('');
-    setError('');
 
     try {
       const payload = await processExpense(token, selectedFile, {
@@ -106,9 +100,9 @@ export default function ExpenseWorkspace({ integrationSettings }) {
         ...prev,
         ...payload.extracted_expense,
       }));
-      setFeedback(t('workspace.feedbackOcr'));
+      toast.success(t('workspace.feedbackOcr'));
     } catch (processError) {
-      setError(processError.message);
+      toast.error(processError.message);
     } finally {
       setProcessing(false);
     }
@@ -116,13 +110,11 @@ export default function ExpenseWorkspace({ integrationSettings }) {
 
   async function handleSubmit() {
     if (!selectedFile) {
-      setError(t('workspace.errNoFileSubmit'));
+      toast.warning(t('workspace.errNoFileSubmit'));
       return;
     }
 
     setSubmitting(true);
-    setFeedback('');
-    setError('');
 
     try {
       const payload = await processExpense(token, selectedFile, {
@@ -132,9 +124,9 @@ export default function ExpenseWorkspace({ integrationSettings }) {
 
       setFormValues((prev) => ({ ...prev, ...payload.expense }));
       setExpenses((prev) => [payload.expense, ...prev]);
-      setFeedback(payload.message || t('workspace.feedbackSaved'));
+      toast.success(payload.message || t('workspace.feedbackSaved'));
     } catch (submitError) {
-      setError(submitError.message);
+      toast.error(submitError.message);
     } finally {
       setSubmitting(false);
     }
@@ -162,13 +154,6 @@ export default function ExpenseWorkspace({ integrationSettings }) {
             values={formValues}
             onChange={(field, value) => setFormValues((prev) => ({ ...prev, [field]: value }))}
           />
-
-          {feedback ? (
-            <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 shadow-sm">{feedback}</p>
-          ) : null}
-          {error ? (
-            <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 shadow-sm">{error}</p>
-          ) : null}
         </div>
       </div>
 

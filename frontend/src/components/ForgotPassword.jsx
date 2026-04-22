@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import LanguageSwitcher from './LanguageSwitcher';
 import { useI18n } from '../hooks/useI18n';
+import { useToast } from '../hooks/useToast';
 import { requestPasswordReset } from '../services/api';
 
 const inputClass =
@@ -9,23 +10,20 @@ const inputClass =
 
 export default function ForgotPassword() {
   const { t } = useI18n();
+  const toast = useToast();
   const [email, setEmail] = useState('');
   const [done, setDone] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setError('');
-    setMessage('');
     setSubmitting(true);
     try {
       const res = await requestPasswordReset({ email: email.trim() });
-      setMessage(res.message || '');
+      toast.success(res.message || t('forgot.checkEmail'));
       setDone(true);
     } catch (err) {
-      setError(err.message);
+      toast.error(err.message);
     } finally {
       setSubmitting(false);
     }
@@ -44,7 +42,7 @@ export default function ForgotPassword() {
         </div>
 
         {done ? (
-          <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{message}</p>
+          <p className="text-sm text-slate-600">{t('forgot.checkEmail')}</p>
         ) : (
           <form className="space-y-4" onSubmit={handleSubmit}>
             <label className="block space-y-2">
@@ -58,9 +56,6 @@ export default function ForgotPassword() {
                 autoComplete="email"
               />
             </label>
-            {error ? (
-              <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">{error}</p>
-            ) : null}
             <button
               type="submit"
               className="w-full rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-4 py-3 font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:from-sky-600 hover:to-blue-700 disabled:cursor-not-allowed disabled:opacity-60"

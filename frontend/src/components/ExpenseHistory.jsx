@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useI18n } from '../hooks/useI18n';
+import { useToast } from '../hooks/useToast';
 import { deleteExpense, listExpenses, retryExpenseOdooSync } from '../services/api';
 
 export default function ExpenseHistory() {
   const { token } = useAuth();
   const { t, dateLocale } = useI18n();
+  const toast = useToast();
   const [expenses, setExpenses] = useState([]);
-  const [feedback, setFeedback] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [busyAction, setBusyAction] = useState('');
   const [retryFiles, setRetryFiles] = useState({});
@@ -37,11 +37,10 @@ export default function ExpenseHistory() {
         const data = await listExpenses(token);
         if (!ignore) {
           setExpenses(data);
-          setError('');
         }
       } catch (loadError) {
         if (!ignore) {
-          setError(loadError.message);
+          toast.error(loadError.message);
         }
       } finally {
         if (!ignore) {
@@ -55,7 +54,7 @@ export default function ExpenseHistory() {
     return () => {
       ignore = true;
     };
-  }, [token]);
+  }, [token, toast]);
 
   const pendingCount = useMemo(() => expenses.filter((expense) => !expense.odoo_synced).length, [expenses]);
 
@@ -66,15 +65,13 @@ export default function ExpenseHistory() {
     }
 
     setBusyAction(`delete-${expenseId}`);
-    setFeedback('');
-    setError('');
 
     try {
       const payload = await deleteExpense(token, expenseId);
       setExpenses((prev) => prev.filter((expense) => expense.id !== expenseId));
-      setFeedback(payload.message || t('history.feedbackDeleted'));
+      toast.success(payload.message || t('history.feedbackDeleted'));
     } catch (actionError) {
-      setError(actionError.message);
+      toast.error(actionError.message);
     } finally {
       setBusyAction('');
     }
@@ -82,8 +79,6 @@ export default function ExpenseHistory() {
 
   async function handleRetry(expenseId) {
     setBusyAction(`retry-${expenseId}`);
-    setFeedback('');
-    setError('');
 
     try {
       const payload = await retryExpenseOdooSync(token, expenseId, retryFiles[expenseId]);
@@ -95,9 +90,9 @@ export default function ExpenseHistory() {
         delete next[expenseId];
         return next;
       });
-      setFeedback(payload.message || t('history.feedbackRetry'));
+      toast.success(payload.message || t('history.feedbackRetry'));
     } catch (actionError) {
-      setError(actionError.message);
+      toast.error(actionError.message);
     } finally {
       setBusyAction('');
     }
@@ -115,15 +110,6 @@ export default function ExpenseHistory() {
           {t('history.summary', { total: expenses.length, pending: pendingCount })}
         </div>
       </div>
-
-      {feedback ? (
-        <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 shadow-sm">
-          {feedback}
-        </p>
-      ) : null}
-      {error ? (
-        <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 shadow-sm">{error}</p>
-      ) : null}
 
       <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-[0_2px_24px_rgba(15,23,42,0.06)] sm:p-6">
         {loading ? (

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import ExpenseHistory from './components/ExpenseHistory';
 import ExpenseWorkspace from './components/ExpenseWorkspace';
@@ -10,6 +10,7 @@ import Settings from './components/Settings';
 import { useAuth } from './hooks/useAuth';
 import { useI18n } from './hooks/useI18n';
 import { usePWA } from './hooks/usePWA';
+import { useToast } from './hooks/useToast';
 import { getIntegrationSettings } from './services/api';
 
 function navLinkClass({ isActive }) {
@@ -50,10 +51,12 @@ function AdminRoute({ children }) {
 function AuthenticatedLayout() {
   const { logout, token, user } = useAuth();
   const { t } = useI18n();
+  const toast = useToast();
   const isAdmin = user?.role === 'admin';
   const { canInstall, offlineReady, promptInstall, updateAvailable } = usePWA();
   const [settings, setSettings] = useState(null);
-  const [settingsError, setSettingsError] = useState('');
+  const offlineToastShown = useRef(false);
+  const updateToastShown = useRef(false);
 
   useEffect(() => {
     let ignore = false;
@@ -63,11 +66,10 @@ function AuthenticatedLayout() {
         const payload = await getIntegrationSettings(token);
         if (!ignore) {
           setSettings(payload);
-          setSettingsError('');
         }
       } catch (error) {
         if (!ignore) {
-          setSettingsError(error.message);
+          toast.error(error.message);
         }
       }
     }
@@ -77,7 +79,21 @@ function AuthenticatedLayout() {
     return () => {
       ignore = true;
     };
-  }, [token]);
+  }, [token, toast]);
+
+  useEffect(() => {
+    if (offlineReady && !offlineToastShown.current) {
+      offlineToastShown.current = true;
+      toast.info(t('app.offlineReady'));
+    }
+  }, [offlineReady, t, toast]);
+
+  useEffect(() => {
+    if (updateAvailable && !updateToastShown.current) {
+      updateToastShown.current = true;
+      toast.info(t('app.updateAvailable'));
+    }
+  }, [updateAvailable, t, toast]);
 
   return (
     <div className="flex min-h-screen">
@@ -182,24 +198,6 @@ function AuthenticatedLayout() {
         </header>
 
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:max-w-none lg:px-8 lg:py-8">
-          {offlineReady ? (
-            <p className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm">
-              {t('app.offlineReady')}
-            </p>
-          ) : null}
-
-          {updateAvailable ? (
-            <p className="mb-6 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 shadow-sm">
-              {t('app.updateAvailable')}
-            </p>
-          ) : null}
-
-          {settingsError ? (
-            <p className="mb-6 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-900 shadow-sm">
-              {settingsError}
-            </p>
-          ) : null}
-
           <Routes>
             <Route path="/" element={<ExpenseWorkspace integrationSettings={settings} />} />
             <Route path="/history" element={<ExpenseHistory />} />

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import LanguageSwitcher from './LanguageSwitcher';
 import { useAuth } from '../hooks/useAuth';
 import { useI18n } from '../hooks/useI18n';
+import { useToast } from '../hooks/useToast';
 
 const initialRegisterState = {
   email: '',
@@ -25,11 +26,10 @@ export default function LoginForm() {
   const from = location.state?.from?.pathname || '/';
   const { login, register, isBootstrapping, isAuthenticated } = useAuth();
   const { t } = useI18n();
+  const toast = useToast();
   const [mode, setMode] = useState('login');
   const [loginState, setLoginState] = useState(initialLoginState);
   const [registerState, setRegisterState] = useState(initialRegisterState);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -41,8 +41,6 @@ export default function LoginForm() {
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setError('');
-    setSuccess('');
     setSubmitting(true);
 
     try {
@@ -66,10 +64,10 @@ export default function LoginForm() {
           full_name: fullName,
           password: registerState.password,
         });
-        setSuccess(t('login.successCreated'));
+        toast.success(t('login.successCreated'));
       }
     } catch (submitError) {
-      setError(submitError.message);
+      toast.error(submitError.message);
     } finally {
       setSubmitting(false);
     }
@@ -176,15 +174,6 @@ export default function LoginForm() {
                 </label>
               ) : null}
 
-              {error ? (
-                <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">{error}</p>
-              ) : null}
-              {success ? (
-                <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-                  {success}
-                </p>
-              ) : null}
-
               <button
                 className="w-full rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-4 py-3 font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:from-sky-600 hover:to-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                 type="submit"
@@ -202,8 +191,6 @@ export default function LoginForm() {
               type="button"
               className="text-sm font-medium text-sky-700 underline decoration-sky-300 underline-offset-4 transition hover:text-sky-900"
               onClick={() => {
-                setError('');
-                setSuccess('');
                 setMode((prev) => (prev === 'login' ? 'register' : 'login'));
               }}
             >

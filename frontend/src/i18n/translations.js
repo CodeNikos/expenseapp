@@ -53,6 +53,7 @@ export const translations = {
       sending: 'Enviando...',
       submit: 'Enviar instrucciones',
       backLogin: 'Volver al inicio de sesion',
+      checkEmail: 'Revisa tu correo. Si la cuenta existe, recibiras instrucciones en breve.',
     },
     reset: {
       recovery: 'Recuperacion',
@@ -107,6 +108,11 @@ export const translations = {
       title: 'Camara',
       subtitle: 'Toma una foto de la factura directamente desde el navegador.',
       capture: 'Capturar imagen',
+      errCapture: 'No se pudo capturar la imagen de la camara.',
+      errAccess: 'No fue posible acceder a la camara.',
+    },
+    toast: {
+      close: 'Cerrar aviso',
     },
     uploader: {
       title: 'Subir archivo',
@@ -281,6 +287,7 @@ export const translations = {
       sending: 'Sending...',
       submit: 'Send instructions',
       backLogin: 'Back to sign in',
+      checkEmail: 'Check your email. If the account exists, you will receive instructions shortly.',
     },
     reset: {
       recovery: 'Recovery',
@@ -335,6 +342,11 @@ export const translations = {
       title: 'Camera',
       subtitle: 'Take a photo of the receipt in the browser.',
       capture: 'Capture image',
+      errCapture: 'Could not capture an image from the camera.',
+      errAccess: 'Could not access the camera.',
+    },
+    toast: {
+      close: 'Dismiss',
     },
     uploader: {
       title: 'Upload file',
