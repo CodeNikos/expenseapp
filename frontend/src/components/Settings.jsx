@@ -8,6 +8,7 @@ import {
   updateAdminUserIntegrations,
   updateAdminUserRole,
 } from '../services/api';
+import ConfirmDialog from './ConfirmDialog';
 import { useAuth } from '../hooks/useAuth';
 import { useI18n } from '../hooks/useI18n';
 import { useToast } from '../hooks/useToast';
@@ -80,6 +81,8 @@ export default function Settings({ onSaved }) {
   const [creating, setCreating] = useState(false);
 
   const [actionBusy, setActionBusy] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmSubmitting, setConfirmSubmitting] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     setUsersLoading(true);
@@ -242,33 +245,53 @@ export default function Settings({ onSaved }) {
     }
   }
 
-  async function handleChangeRole(targetUser) {
+  function openChangeRoleDialog(targetUser) {
     const newRole = targetUser.role === 'admin' ? 'user' : 'admin';
     const roleName = newRole === 'admin' ? t('settings.roleAdmin') : t('settings.roleUser');
-    if (!window.confirm(t('settings.confirmChangeRole', { name: targetUser.full_name, role: roleName }))) return;
-    setActionBusy(`role-${targetUser.id}`);
-    try {
-      const updated = await updateAdminUserRole(token, targetUser.id, newRole);
-      setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
-      toast.success(t('settings.roleChanged', { name: updated.full_name, role: roleName }));
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setActionBusy(null);
-    }
+    setConfirmAction({ type: 'role', user: targetUser, newRole, roleName });
   }
 
-  async function handleDeleteUser(targetUser) {
-    if (!window.confirm(t('settings.confirmDeleteUser', { name: targetUser.full_name }))) return;
-    setActionBusy(`delete-${targetUser.id}`);
+  function openDeleteDialog(targetUser) {
+    setConfirmAction({ type: 'delete', user: targetUser });
+  }
+
+  function closeConfirmDialog() {
+    if (confirmSubmitting) {
+      return;
+    }
+    setConfirmAction(null);
+  }
+
+  async function handleConfirmDialogSubmit() {
+    if (!confirmAction || confirmSubmitting) {
+      return;
+    }
+    setConfirmSubmitting(true);
+    if (confirmAction.type === 'role') {
+      setActionBusy(`role-${confirmAction.user.id}`);
+    } else {
+      setActionBusy(`delete-${confirmAction.user.id}`);
+    }
     try {
-      await deleteAdminUser(token, targetUser.id);
-      setUsers((prev) => prev.filter((u) => u.id !== targetUser.id));
-      if (selectedUserId === targetUser.id) setSelectedUserId(null);
-      toast.success(t('settings.userDeleted', { name: targetUser.full_name }));
+      if (confirmAction.type === 'role') {
+        const { user, newRole, roleName } = confirmAction;
+        const updated = await updateAdminUserRole(token, user.id, newRole);
+        setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+        toast.success(t('settings.roleChanged', { name: updated.full_name, role: roleName }));
+      } else {
+        const { user } = confirmAction;
+        await deleteAdminUser(token, user.id);
+        setUsers((prev) => prev.filter((u) => u.id !== user.id));
+        if (selectedUserId === user.id) {
+          setSelectedUserId(null);
+        }
+        toast.success(t('settings.userDeleted', { name: user.full_name }));
+      }
+      setConfirmAction(null);
     } catch (err) {
       toast.error(err.message);
     } finally {
+      setConfirmSubmitting(false);
       setActionBusy(null);
     }
   }
@@ -496,8 +519,8 @@ export default function Settings({ onSaved }) {
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    disabled={!!actionBusy}
-                    onClick={() => handleChangeRole(selectedUser)}
+                    disabled={!!actionBusy || confirmAction != null || confirmSubmitting}
+                    onClick={() => openChangeRoleDialog(selectedUser)}
                     className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-800 shadow-sm transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {busyRole
@@ -508,8 +531,8 @@ export default function Settings({ onSaved }) {
                   </button>
                   <button
                     type="button"
-                    disabled={!!actionBusy}
-                    onClick={() => handleDeleteUser(selectedUser)}
+                    disabled={!!actionBusy || confirmAction != null || confirmSubmitting}
+                    onClick={() => openDeleteDialog(selectedUser)}
                     className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 shadow-sm transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {busyDel ? t('settings.deletingUser') : t('settings.deleteUser')}
@@ -604,6 +627,36 @@ export default function Settings({ onSaved }) {
           </div>
         </form>
       </div>
+
+      {confirmAction ? (
+        <ConfirmDialog
+          open
+          variant={confirmAction.type === 'delete' ? 'danger' : 'violet'}
+          title={
+            confirmAction.type === 'delete'
+              ? t('settings.confirmDialogDeleteTitle')
+              : t('settings.confirmDialogRoleTitle')
+          }
+          description={
+            confirmAction.type === 'delete'
+              ? t('settings.confirmDeleteUser', { name: confirmAction.user.full_name })
+              : t('settings.confirmChangeRole', {
+                  name: confirmAction.user.full_name,
+                  role: confirmAction.roleName,
+                })
+          }
+          cancelLabel={t('settings.confirmDialogCancel')}
+          confirmLabel={
+            confirmAction.type === 'delete'
+              ? t('settings.confirmDialogDelete')
+              : t('settings.confirmDialogApplyRole')
+          }
+          busyLabel={t('settings.confirmDialogBusy')}
+          busy={confirmSubmitting}
+          onCancel={closeConfirmDialog}
+          onConfirm={handleConfirmDialogSubmit}
+        />
+      ) : null}
     </section>
   );
 }
